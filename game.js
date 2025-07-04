@@ -232,10 +232,12 @@ class DeerPinball {
     }
     
     launchBall() {
-        if (!this.gameRunning && this.balls > 0) {
+        if (!this.gameRunning && this.balls > 0 && this.ball.inLaunchLane) {
             this.gameRunning = true;
-            this.ball.vx = (Math.random() - 0.5) * 4;
-            this.ball.vy = -15 - Math.random() * 5;
+            this.ball.launching = true;
+            this.ball.launchProgress = 0;
+            this.ball.vx = 0;
+            this.ball.vy = -18 - Math.random() * 4;
         }
     }
     
@@ -273,54 +275,92 @@ class DeerPinball {
     
     updateBall() {
         if (!this.gameRunning) return;
-        
-        // Apply gravity
+
+        // If launching from the lane, animate up and around the curve
+        if (this.ball.launching) {
+            const canvasWidth = this.canvas.width / (window.devicePixelRatio || 1);
+            const canvasHeight = this.canvas.height / (window.devicePixelRatio || 1);
+            const playfieldMargin = 16;
+            const laneWidth = 40;
+            const curveRadius = 48;
+            // Move up the launch lane
+            if (this.ball.y > 80 + curveRadius && !this.ball.curving) {
+                this.ball.y += this.ball.vy;
+                // Keep ball in the center of the launch lane
+                this.ball.x = canvasWidth - laneWidth / 2 - playfieldMargin;
+            } else {
+                // Animate along the curve into the playfield
+                this.ball.curving = true;
+                if (!this.ball.curveAngle) this.ball.curveAngle = Math.PI / 2;
+                // Curve center
+                const cx = canvasWidth - laneWidth - playfieldMargin + curveRadius;
+                const cy = 80 + curveRadius;
+                // Move along the curve
+                this.ball.curveAngle -= 0.06;
+                this.ball.x = cx + Math.cos(this.ball.curveAngle) * curveRadius;
+                this.ball.y = cy - Math.sin(this.ball.curveAngle) * curveRadius;
+                if (this.ball.curveAngle <= 0) {
+                    // Enter playfield at the top
+                    this.ball.launching = false;
+                    this.ball.curving = false;
+                    this.ball.curveAngle = undefined;
+                    this.ball.inLaunchLane = false;
+                    this.ball.x = canvasWidth - laneWidth - playfieldMargin - this.ball.radius - 2;
+                    this.ball.y = 80 + this.ball.radius + 2;
+                    this.ball.vx = -4 + Math.random() * 2;
+                    this.ball.vy = 2 + Math.random() * 2;
+                }
+            }
+            return;
+        }
+
+        // Normal playfield physics
         this.ball.vy += this.ball.gravity;
-        
-        // Apply friction
         this.ball.vx *= this.ball.friction;
         this.ball.vy *= this.ball.friction;
-        
-        // Update position
         this.ball.x += this.ball.vx;
         this.ball.y += this.ball.vy;
-        
-        // Check wall collisions
-        this.checkWallCollisions();
-        
-        // Check flipper collisions
+
+        // Wall collision for playfield
+        this.checkPlayfieldCollisions();
         this.checkFlipperCollisions();
-        
-        // Check bumper collisions
         this.checkBumperCollisions();
-        
-        // Check target collisions
         this.checkTargetCollisions();
-        
-        // Check if ball is lost
         if (this.ball.y > this.canvas.height / (window.devicePixelRatio || 1)) {
             this.loseBall();
         }
     }
     
-    checkWallCollisions() {
+    checkPlayfieldCollisions() {
         const canvasWidth = this.canvas.width / (window.devicePixelRatio || 1);
         const canvasHeight = this.canvas.height / (window.devicePixelRatio || 1);
-        
-        // Left and right walls
-        if (this.ball.x - this.ball.radius < 10) {
-            this.ball.x = 10 + this.ball.radius;
+        const playfieldMargin = 16;
+        const laneWidth = 40;
+        // Left and right boundaries of playfield
+        // Left wall
+        if (this.ball.x - this.ball.radius < playfieldMargin) {
+            this.ball.x = playfieldMargin + this.ball.radius;
             this.ball.vx = Math.abs(this.ball.vx) * 0.8;
         }
-        if (this.ball.x + this.ball.radius > canvasWidth - 10) {
-            this.ball.x = canvasWidth - 10 - this.ball.radius;
+        // Right wall (playfield)
+        if (!this.ball.inLaunchLane && this.ball.x + this.ball.radius > canvasWidth - laneWidth - playfieldMargin) {
+            this.ball.x = canvasWidth - laneWidth - playfieldMargin - this.ball.radius;
             this.ball.vx = -Math.abs(this.ball.vx) * 0.8;
         }
-        
         // Top wall
-        if (this.ball.y - this.ball.radius < 10) {
-            this.ball.y = 10 + this.ball.radius;
+        if (this.ball.y - this.ball.radius < playfieldMargin + 8) {
+            this.ball.y = playfieldMargin + 8 + this.ball.radius;
             this.ball.vy = Math.abs(this.ball.vy) * 0.8;
+        }
+        // Launch lane left wall
+        if (this.ball.inLaunchLane && this.ball.x - this.ball.radius < canvasWidth - laneWidth - playfieldMargin + 8) {
+            this.ball.x = canvasWidth - laneWidth - playfieldMargin + 8 + this.ball.radius;
+            this.ball.vx = Math.abs(this.ball.vx) * 0.8;
+        }
+        // Launch lane right wall
+        if (this.ball.inLaunchLane && this.ball.x + this.ball.radius > canvasWidth - playfieldMargin - 8) {
+            this.ball.x = canvasWidth - playfieldMargin - 8 - this.ball.radius;
+            this.ball.vx = -Math.abs(this.ball.vx) * 0.8;
         }
     }
     
@@ -422,17 +462,22 @@ class DeerPinball {
         this.balls--;
         this.gameRunning = false;
         this.updateDisplay();
-        
         if (this.balls <= 0) {
             this.gameOver();
         } else {
-            // Reset ball position
+            // Reset ball to launch lane
             const canvasWidth = this.canvas.width / (window.devicePixelRatio || 1);
             const canvasHeight = this.canvas.height / (window.devicePixelRatio || 1);
-            this.ball.x = canvasWidth - 40 / 2 - 16;
+            const laneWidth = 40;
+            const playfieldMargin = 16;
+            this.ball.x = canvasWidth - laneWidth / 2 - playfieldMargin;
             this.ball.y = canvasHeight - 40;
             this.ball.vx = 0;
             this.ball.vy = 0;
+            this.ball.inLaunchLane = true;
+            this.ball.launching = false;
+            this.ball.curving = false;
+            this.ball.curveAngle = undefined;
         }
     }
     
@@ -446,18 +491,19 @@ class DeerPinball {
         this.balls = 3;
         this.gameRunning = false;
         this.particles = [];
-        
-        // Reset targets
         this.targets.forEach(target => target.hit = false);
-        
-        // Reset ball
         const canvasWidth = this.canvas.width / (window.devicePixelRatio || 1);
         const canvasHeight = this.canvas.height / (window.devicePixelRatio || 1);
-        this.ball.x = canvasWidth - 40 / 2 - 16;
+        const laneWidth = 40;
+        const playfieldMargin = 16;
+        this.ball.x = canvasWidth - laneWidth / 2 - playfieldMargin;
         this.ball.y = canvasHeight - 40;
         this.ball.vx = 0;
         this.ball.vy = 0;
-        
+        this.ball.inLaunchLane = true;
+        this.ball.launching = false;
+        this.ball.curving = false;
+        this.ball.curveAngle = undefined;
         document.getElementById('gameOver').style.display = 'none';
         this.updateDisplay();
     }
