@@ -53,15 +53,40 @@ class DeerPinball {
         const canvasHeight = this.canvas.height / (window.devicePixelRatio || 1);
         const laneWidth = 40;
         const playfieldMargin = 16;
-        const flipperLength = 60;
-        const flipperY = canvasHeight - 60;
-        const flipperAngle = Math.PI / 6;
+        const funnelHeight = 90;
+        const flipperLength = Math.max(60, canvasWidth * 0.18);
+        const flipperGap = Math.max(10, canvasWidth * 0.025);
+        const outlaneWidth = Math.max(36, canvasWidth * 0.08);
+        const bottomWallY = canvasHeight - playfieldMargin;
+        const drainRadius = Math.max(32, canvasWidth * 0.08);
+        const flipperTipY = canvasHeight - 32 - canvasHeight * 0.10;
+        const flipperBaseY = bottomWallY - 18 - canvasHeight * 0.10;
+        const flipperBaseX_L = playfieldMargin + outlaneWidth + 18;
+        const flipperBaseX_R = canvasWidth - laneWidth - playfieldMargin - outlaneWidth - 18;
+        const flipperTipX_L = canvasWidth / 2 - flipperGap / 2;
+        const flipperTipX_R = canvasWidth / 2 + flipperGap / 2;
+        // Flipper geometry as single source of truth
+        this.flipperGeom = [
+            {
+                base: { x: flipperBaseX_L, y: flipperBaseY },
+                tip: { x: flipperTipX_L, y: flipperTipY },
+                length: flipperLength
+            },
+            {
+                base: { x: flipperBaseX_R, y: flipperBaseY },
+                tip: { x: flipperTipX_R, y: flipperTipY },
+                length: flipperLength
+            }
+        ];
+        // Calculate angle from base to tip for each flipper
+        const leftAngle = Math.atan2(flipperTipY - flipperBaseY, flipperTipX_L - flipperBaseX_L);
+        const rightAngle = Math.atan2(flipperTipY - flipperBaseY, flipperTipX_R - flipperBaseX_R);
 
         // Ball starts in the launch lane
         this.ball = {
             x: canvasWidth - laneWidth / 2 - playfieldMargin,
             y: canvasHeight - 40,
-            radius: 8,
+            radius: Math.max(8, canvasWidth * 0.018),
             vx: 0,
             vy: 0,
             gravity: 0.3,
@@ -70,70 +95,120 @@ class DeerPinball {
             inLaunchLane: true
         };
 
-        // Flippers at bottom center, angled inward
+        // Flippers: use geometry for both drawing and collision
         this.flippers = [
             {
-                x: canvasWidth / 2 - 40,
-                y: flipperY,
+                x: this.flipperGeom[0].base.x,
+                y: this.flipperGeom[0].base.y,
                 width: flipperLength,
                 height: 15,
-                angle: -flipperAngle,
-                maxAngle: -flipperAngle - Math.PI / 6,
-                minAngle: -flipperAngle + Math.PI / 8,
+                angle: leftAngle,
+                maxAngle: leftAngle + Math.PI / 8,
+                minAngle: leftAngle - Math.PI / 8,
                 angularVelocity: 0,
                 angularAcceleration: 0.8,
                 damping: 0.95,
-                color: '#654321',
-                isPressed: false
+                color: '#228B22',
+                isPressed: false,
+                tipX: this.flipperGeom[0].tip.x,
+                tipY: this.flipperGeom[0].tip.y
             },
             {
-                x: canvasWidth / 2 + 40,
-                y: flipperY,
+                x: this.flipperGeom[1].base.x,
+                y: this.flipperGeom[1].base.y,
                 width: flipperLength,
                 height: 15,
-                angle: flipperAngle,
-                maxAngle: flipperAngle + Math.PI / 6,
-                minAngle: flipperAngle - Math.PI / 8,
+                angle: rightAngle,
+                maxAngle: rightAngle - Math.PI / 8,
+                minAngle: rightAngle + Math.PI / 8,
                 angularVelocity: 0,
                 angularAcceleration: 0.8,
                 damping: 0.95,
-                color: '#654321',
-                isPressed: false
+                color: '#228B22',
+                isPressed: false,
+                tipX: this.flipperGeom[1].tip.x,
+                tipY: this.flipperGeom[1].tip.y
             }
         ];
 
-        // Bumpers and targets repositioned for new playfield
+        // Bumpers and pegs (unchanged)
         this.bumpers = [
-            { x: canvasWidth / 2, y: canvasHeight * 0.22, radius: 28, color: '#A0522D', emoji: '🦌', points: 150 },
-            { x: canvasWidth * 0.32, y: canvasHeight * 0.32, radius: 22, color: '#8B4513', emoji: '🦌', points: 100 },
-            { x: canvasWidth * 0.68, y: canvasHeight * 0.32, radius: 22, color: '#8B4513', emoji: '🦌', points: 100 },
-            { x: canvasWidth * 0.42, y: canvasHeight * 0.42, radius: 16, color: '#CD853F', emoji: '🍂', points: 75 },
-            { x: canvasWidth * 0.58, y: canvasHeight * 0.42, radius: 16, color: '#CD853F', emoji: '🍂', points: 75 }
+            { x: canvasWidth * 0.32, y: canvasHeight * 0.22, radius: Math.max(18, canvasWidth * 0.04), color: '#8B4513', emoji: '🦌', points: 100 },
+            { x: canvasWidth * 0.68, y: canvasHeight * 0.22, radius: Math.max(18, canvasWidth * 0.04), color: '#8B4513', emoji: '🦌', points: 100 },
+            { x: canvasWidth * 0.5, y: canvasHeight * 0.16, radius: Math.max(22, canvasWidth * 0.05), color: '#A0522D', emoji: '🦌', points: 150 },
+            { x: canvasWidth * 0.4, y: canvasHeight * 0.32, radius: Math.max(10, canvasWidth * 0.025), color: '#8B4513', emoji: '🌲', points: 60 },
+            { x: canvasWidth * 0.6, y: canvasHeight * 0.32, radius: Math.max(10, canvasWidth * 0.025), color: '#8B4513', emoji: '🌲', points: 60 },
+            { x: canvasWidth * 0.3, y: canvasHeight * 0.45, radius: Math.max(8, canvasWidth * 0.02), color: '#A0522D', emoji: '🌰', points: 50 },
+            { x: canvasWidth * 0.7, y: canvasHeight * 0.45, radius: Math.max(8, canvasWidth * 0.02), color: '#A0522D', emoji: '🌰', points: 50 }
         ];
         this.targets = [
             { x: canvasWidth * 0.18, y: canvasHeight * 0.55, width: 15, height: 20, hit: false, emoji: '🌰', points: 50 },
-            { x: canvasWidth * 0.82, y: canvasHeight * 0.55, width: 15, height: 20, hit: false, emoji: '🌰', points: 50 },
-            { x: canvasWidth * 0.18, y: canvasHeight * 0.65, width: 15, height: 20, hit: false, emoji: '🌰', points: 50 },
-            { x: canvasWidth * 0.82, y: canvasHeight * 0.65, width: 15, height: 20, hit: false, emoji: '🌰', points: 50 }
+            { x: canvasWidth * 0.82, y: canvasHeight * 0.55, width: 15, height: 20, hit: false, emoji: '🌰', points: 50 }
         ];
 
-        // Playfield boundaries as a path (rounded top, sloped sides, launch lane)
+        // Playfield boundaries as a path (rounded top, sloped sides, classic U drain)
         this.playfieldPath = new Path2D();
-        this.playfieldPath.moveTo(playfieldMargin, canvasHeight - playfieldMargin);
+        // Start at left outlane
+        this.playfieldPath.moveTo(playfieldMargin + outlaneWidth, bottomWallY - funnelHeight / 2);
+        // Left funnel curve
+        this.playfieldPath.bezierCurveTo(
+            playfieldMargin + 8, canvasHeight - funnelHeight * 0.7,
+            playfieldMargin, canvasHeight - funnelHeight * 1.1,
+            playfieldMargin, canvasHeight - funnelHeight - 60
+        );
+        // Left side up to top
         this.playfieldPath.lineTo(playfieldMargin, 80);
         this.playfieldPath.quadraticCurveTo(
             canvasWidth / 2, playfieldMargin,
             canvasWidth - laneWidth - playfieldMargin, 80
         );
-        this.playfieldPath.lineTo(canvasWidth - laneWidth - playfieldMargin, canvasHeight - playfieldMargin);
+        // Right side down to funnel
+        this.playfieldPath.lineTo(canvasWidth - laneWidth - playfieldMargin, canvasHeight - funnelHeight - 60);
+        this.playfieldPath.bezierCurveTo(
+            canvasWidth - laneWidth - playfieldMargin, canvasHeight - funnelHeight * 1.1,
+            canvasWidth - laneWidth - playfieldMargin + 8, canvasHeight - funnelHeight * 0.7,
+            canvasWidth - laneWidth - playfieldMargin + outlaneWidth, bottomWallY - funnelHeight / 2
+        );
+        // Wall guide to right flipper base
+        this.playfieldPath.lineTo(flipperBaseX_R, flipperBaseY);
+        // U-shaped drain
+        this.playfieldPath.arc(
+            canvasWidth / 2, flipperTipY + drainRadius / 2, drainRadius, 0.15 * Math.PI, 0.85 * Math.PI, true
+        );
+        // Wall guide to left flipper base
+        this.playfieldPath.lineTo(flipperBaseX_L, flipperBaseY);
         this.playfieldPath.closePath();
 
-        // Launch lane path
+        // Internal sloped/angled walls for interesting gameplay (all slope inward, mirrored)
+        this.internalWalls = [
+            // Left lower guide (slopes inward)
+            [
+                { x: playfieldMargin + outlaneWidth + 10, y: bottomWallY - funnelHeight / 2 - 10 },
+                { x: canvasWidth / 2 - 60, y: canvasHeight * 0.7 - canvasHeight * 0.10 }
+            ],
+            // Right lower guide (slopes inward)
+            [
+                { x: canvasWidth - laneWidth - playfieldMargin - outlaneWidth - 10, y: bottomWallY - funnelHeight / 2 - 10 },
+                { x: canvasWidth / 2 + 60, y: canvasHeight * 0.7 - canvasHeight * 0.10 }
+            ],
+            // Mid left angled wall (slopes inward)
+            [
+                { x: playfieldMargin + 30, y: canvasHeight * 0.45 },
+                { x: canvasWidth / 2 - 80, y: canvasHeight * 0.25 }
+            ],
+            // Mid right angled wall (slopes inward)
+            [
+                { x: canvasWidth - laneWidth - playfieldMargin - 30, y: canvasHeight * 0.45 },
+                { x: canvasWidth / 2 + 80, y: canvasHeight * 0.25 }
+            ]
+        ];
+
+        // Launch lane path (unchanged)
         this.launchLanePath = new Path2D();
-        this.launchLanePath.moveTo(canvasWidth - laneWidth - playfieldMargin, canvasHeight - playfieldMargin);
+        this.launchLanePath.moveTo(canvasWidth - laneWidth - playfieldMargin, bottomWallY);
         this.launchLanePath.lineTo(canvasWidth - laneWidth - playfieldMargin, 80);
         this.launchLanePath.lineTo(canvasWidth - playfieldMargin, 80);
-        this.launchLanePath.lineTo(canvasWidth - playfieldMargin, canvasHeight - playfieldMargin);
+        this.launchLanePath.lineTo(canvasWidth - playfieldMargin, bottomWallY);
         this.launchLanePath.closePath();
 
         // Spring launcher in the launch lane
@@ -323,6 +398,8 @@ class DeerPinball {
 
         // Wall collision for playfield
         this.checkPlayfieldCollisions();
+        // Internal wall collision
+        this.checkInternalWallCollisions();
         this.checkFlipperCollisions();
         this.checkBumperCollisions();
         this.checkTargetCollisions();
@@ -336,7 +413,11 @@ class DeerPinball {
         const canvasHeight = this.canvas.height / (window.devicePixelRatio || 1);
         const playfieldMargin = 16;
         const laneWidth = 40;
-        // Left and right boundaries of playfield
+        const outlaneWidth = 36;
+        const funnelHeight = 80;
+        const bottomWallY = canvasHeight - playfieldMargin;
+        const drainRadius = 28;
+        const flipperTipY = canvasHeight - 32;
         // Left wall
         if (this.ball.x - this.ball.radius < playfieldMargin) {
             this.ball.x = playfieldMargin + this.ball.radius;
@@ -352,6 +433,27 @@ class DeerPinball {
             this.ball.y = playfieldMargin + 8 + this.ball.radius;
             this.ball.vy = Math.abs(this.ball.vy) * 0.8;
         }
+        // Outlane left slope
+        if (
+            this.ball.y > bottomWallY - funnelHeight / 2 - 10 &&
+            this.ball.x < playfieldMargin + outlaneWidth &&
+            this.ball.y < bottomWallY - 10
+        ) {
+            // Reflect off left outlane
+            this.ball.vx = Math.abs(this.ball.vx) * 0.8;
+            this.ball.x = playfieldMargin + outlaneWidth + this.ball.radius;
+        }
+        // Outlane right slope
+        if (
+            this.ball.y > bottomWallY - funnelHeight / 2 - 10 &&
+            this.ball.x > canvasWidth - laneWidth - playfieldMargin - outlaneWidth &&
+            this.ball.x < canvasWidth - laneWidth - playfieldMargin &&
+            this.ball.y < bottomWallY - 10
+        ) {
+            // Reflect off right outlane
+            this.ball.vx = -Math.abs(this.ball.vx) * 0.8;
+            this.ball.x = canvasWidth - laneWidth - playfieldMargin - outlaneWidth - this.ball.radius;
+        }
         // Launch lane left wall
         if (this.ball.inLaunchLane && this.ball.x - this.ball.radius < canvasWidth - laneWidth - playfieldMargin + 8) {
             this.ball.x = canvasWidth - laneWidth - playfieldMargin + 8 + this.ball.radius;
@@ -361,6 +463,46 @@ class DeerPinball {
         if (this.ball.inLaunchLane && this.ball.x + this.ball.radius > canvasWidth - playfieldMargin - 8) {
             this.ball.x = canvasWidth - playfieldMargin - 8 - this.ball.radius;
             this.ball.vx = -Math.abs(this.ball.vx) * 0.8;
+        }
+        // Drain: lose ball if it falls into the blue arc (center funnel)
+        const dx = this.ball.x - canvasWidth / 2;
+        const dy = this.ball.y - flipperTipY;
+        if (dy > 0 && Math.sqrt(dx * dx + dy * dy) < drainRadius - 2) {
+            this.loseBall();
+        }
+        // Otherwise, reflect off bottom wall
+        if (this.ball.y + this.ball.radius > bottomWallY &&
+            (this.ball.x <= playfieldMargin + outlaneWidth || this.ball.x >= canvasWidth - laneWidth - playfieldMargin - outlaneWidth)) {
+            this.ball.y = bottomWallY - this.ball.radius;
+            this.ball.vy = -Math.abs(this.ball.vy) * 0.8;
+        }
+    }
+    
+    checkInternalWallCollisions() {
+        if (!this.internalWalls) return;
+        for (const wall of this.internalWalls) {
+            const x1 = wall[0].x, y1 = wall[0].y;
+            const x2 = wall[1].x, y2 = wall[1].y;
+            // Closest point on line segment to ball
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const lengthSq = dx * dx + dy * dy;
+            let t = ((this.ball.x - x1) * dx + (this.ball.y - y1) * dy) / lengthSq;
+            t = Math.max(0, Math.min(1, t));
+            const closestX = x1 + t * dx;
+            const closestY = y1 + t * dy;
+            const dist = Math.hypot(this.ball.x - closestX, this.ball.y - closestY);
+            if (dist < this.ball.radius + 3) {
+                // Reflect ball
+                const nx = (this.ball.x - closestX) / dist;
+                const ny = (this.ball.y - closestY) / dist;
+                const dot = this.ball.vx * nx + this.ball.vy * ny;
+                this.ball.vx -= 2 * dot * nx;
+                this.ball.vy -= 2 * dot * ny;
+                // Move ball out of wall
+                this.ball.x = closestX + nx * (this.ball.radius + 3);
+                this.ball.y = closestY + ny * (this.ball.radius + 3);
+            }
         }
     }
     
@@ -540,6 +682,40 @@ class DeerPinball {
         this.ctx.fill(this.playfieldPath);
         this.ctx.stroke(this.playfieldPath);
         this.ctx.restore();
+
+        // Draw internal walls/guides
+        this.ctx.save();
+        this.ctx.strokeStyle = '#654321';
+        this.ctx.lineWidth = 6;
+        this.internalWalls.forEach(wall => {
+            this.ctx.beginPath();
+            this.ctx.moveTo(wall[0].x, wall[0].y);
+            this.ctx.lineTo(wall[1].x, wall[1].y);
+            this.ctx.stroke();
+        });
+        this.ctx.restore();
+
+        // Debug overlay: draw flipper collision lines
+        if (window.DEBUG_PINBALL) {
+            this.ctx.save();
+            this.ctx.strokeStyle = '#00f';
+            this.ctx.lineWidth = 3;
+            this.flipperGeom.forEach(flip => {
+                this.ctx.beginPath();
+                this.ctx.moveTo(flip.base.x, flip.base.y);
+                this.ctx.lineTo(flip.tip.x, flip.tip.y);
+                this.ctx.stroke();
+            });
+            // Draw internal wall collision lines
+            this.ctx.strokeStyle = '#f0f';
+            this.internalWalls.forEach(wall => {
+                this.ctx.beginPath();
+                this.ctx.moveTo(wall[0].x, wall[0].y);
+                this.ctx.lineTo(wall[1].x, wall[1].y);
+                this.ctx.stroke();
+            });
+            this.ctx.restore();
+        }
 
         // Draw launch lane
         this.ctx.save();
