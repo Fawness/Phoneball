@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦌 Deer Pinball 🦌</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="score-board">
+                <div class="score">Score: <span id="score">0</span></div>
+                <div class="balls">Balls: <span id="balls">3</span></div>
+            </div>
+            <div class="title">🦌 Deer Pinball 🦌</div>
+        </div>
+        
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        
+        <div class="controls-info">
+            <div class="mobile-controls">
+                <div>📱 Tap left/right for flippers</div>
+                <div>📱 Swipe down to launch</div>
+            </div>
+            <div class="desktop-controls">
+                <div>⌨️ Left/Right arrows for flippers</div>
+                <div>⌨️ Spacebar to launch</div>
+            </div>
+        </div>
+        
+        <div class="game-over" id="gameOver">
+            <div class="game-over-content">
+                <h2>🦌 Game Over! 🦌</h2>
+                <p>Final Score: <span id="finalScore">0</span></p>
+                <button id="restartBtn">Play Again</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html> 
